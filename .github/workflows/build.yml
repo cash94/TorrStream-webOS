@@ -1,0 +1,64 @@
+# Сборка ipk для webOS (LG) по тегу v* (git tag v1.0.1 && git push origin v1.0.1).
+#
+# Версия пакета берётся из тега и подставляется в app/appinfo.json, поэтому
+# править её руками не нужно. Результат — релиз с двумя одинаковыми файлами:
+#   com.torrstream.app_<версия>_all.ipk  — как называет пакет webOS CLI;
+#   TorrStream-webOS.ipk                  — постоянное имя для ссылки
+#   releases/latest/download/TorrStream-webOS.ipk.
+# Запуск вручную (Actions → build → Run workflow) — только сборка, ipk в артефакте.
+name: build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Версия из тега
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          python3 - "$VER" <<'EOF'
+          import json, sys
+          p = 'app/appinfo.json'
+          d = json.load(open(p, encoding='utf-8'))
+          d['version'] = sys.argv[1]
+          open(p, 'w', encoding='utf-8').write(json.dumps(d, ensure_ascii=False, indent=4) + '\n')
+          EOF
+          cat app/appinfo.json
+
+      - name: ipk
+        run: |
+          mkdir -p dist
+          npx -y -p @webos-tools/cli ares-package app -o dist
+          cp dist/com.torrstream.app_*_all.ipk dist/TorrStream-webOS.ipk
+          ls -la dist
+
+      - name: Релиз
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.ipk \
+            --title "TorrStream для webOS ${GITHUB_REF_NAME#v}" \
+            --notes "Установка: Developer Mode (ares-install) или Homebrew Channel. Интерфейс открывается с сервера TorrStream (по умолчанию torrstream.online) и обновляется без переустановки ipk."
+
+      - name: Артефакт
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: TorrStream-webOS
+          path: dist/*.ipk
+          retention-days: 7
