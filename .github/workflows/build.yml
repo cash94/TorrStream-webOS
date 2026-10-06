@@ -1,11 +1,10 @@
 # Сборка ipk для webOS (LG) по тегу v* (git tag v1.0.1 && git push origin v1.0.1).
 #
 # Версия пакета берётся из тега (tools/build.py --version), править руками не
-# нужно. Собираются два приложения (tools/build.py):
-#   com.torrstream.app     → TorrStream-webOS.ipk — обычное;
-#   com.torrstream.app.ts  → TorrStream-webOS-TorrServer.ipk — со встроенным
-#                            TorrServer (нужен root через Homebrew Channel).
-# Постоянные имена — для ссылки releases/latest/download/<имя>.
+# нужно. Результат — com.torrstream.app_<версия>_all.ipk и постоянное имя
+# TorrStream-webOS.ipk для ссылки releases/latest/download/TorrStream-webOS.ipk.
+# Встроенный TorrServer (с 1.0.2) — в этой же сборке; ставить свой TorrServer
+# можно только с root через Homebrew Channel.
 # Запуск вручную (Actions → build → Run workflow) — только сборка, ipk в артефакте.
 name: build
 
@@ -27,12 +26,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: ipk (обычный и с TorrServer)
+      - name: ipk
         run: |
           VER=""
           case "$GITHUB_REF" in refs/tags/v*) VER="--version ${GITHUB_REF_NAME#v}";; esac
           python3 tools/build.py $VER
-          python3 tools/build.py --ts $VER
           ls -la dist
 
       - name: Релиз
@@ -42,7 +40,7 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.ipk \
             --title "TorrStream для webOS ${GITHUB_REF_NAME#v}" \
-            --notes "TorrStream-webOS.ipk — обычное приложение. TorrStream-webOS-TorrServer.ipk — отдельное приложение со встроенным TorrServer (скачивается официальная сборка; нужен Homebrew Channel с root). Установка: Developer Mode (ares-install) или Homebrew Channel."
+            --notes "Приложение TorrStream для webOS со встроенным TorrServer: на телевизоре с root (Homebrew Channel) TorrServer скачивается и запускается из настроек; без root приложение работает как обычно. Установка: webOS Dev Manager (Developer Mode или root). Отдельная сборка com.torrstream.app.ts больше не нужна — её можно удалить."
 
       - name: Артефакт
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}

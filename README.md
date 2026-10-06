@@ -11,11 +11,24 @@ ffmpeg и серверного HLS. Поэтому TorrServer может быт�
 сервере — телевизор ходит к нему напрямую.
 
 Во фронтенде (`public/js` TorrStream) за это отвечают:
-- `config.js: detectPlatform` — webOS по `Web0S` в User-Agent или `PalmSystem`;
+- `config.js: detectPlatform` — webOS только по `PalmSystem` / `webOSSystem` (их даёт
+  среда приложений webOS; браузер телевизора считается обычным браузером);
 - `app.js: setupCheckboxes` — на webOS всегда прямой режим (`transcodingFullOnOff`),
   настройки серверного транскодирования скрыты, как в Android-приложении;
 - `player.js: initTranscodingOffPlayback` — сам прямой путь: `<ts>/stream?link=…&play`,
   дорожки звука из `video.audioTracks`.
+
+## Встроенный TorrServer
+
+С 1.0.2 — в основной сборке (до неё была отдельная `com.torrstream.app.ts`).
+Настройки → TorrServer → «Использовать TorrServer, установленный на этом
+устройстве», как в Android-приложении. Сначала проверяется
+`127.0.0.1:8090/echo`: если TorrServer уже работает — используется он. Иначе на
+телевизоре с root (Homebrew Channel) приложение скачивает официальную сборку
+YouROK `TorrServer-linux-arm7` в `/media/developer/torrstream-torrserver`,
+запускает её и ставит автозапуск (`/var/lib/webosbrew/init.d`). Всё через
+`luna://org.webosbrew.hbchannel.service/exec`; код — `torrents.js: WebOSTorrServer`.
+Без root приложение работает как обычно.
 
 ## Что в пакете
 
