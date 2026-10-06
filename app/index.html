@@ -60,6 +60,9 @@
 <script>
 (function () {
   var DEFAULT_URL = 'http://torrstream.online';
+  // Метка для фронтенда TorrStream. Сборка с TorrServer (tools/build.py --ts)
+  // подставляет сюда 'tsdevice=1' — по ней включается встроенный TorrServer
+  var EXTRA_QUERY = '';
   var KEY = 'torrstreamServerUrl';
   var COUNTDOWN = 3;
   var KEYS = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, OK: 13, BACK: 461, ESC: 27 };
@@ -141,7 +144,7 @@
     probe(url, function (ok) {
       if (!ok) { showForm(url.replace(/^https?:\/\//, '') + ' — не отвечает или это не сервер TorrStream', true, url); return; }
       save(url);
-      location.replace(url + '/');
+      location.replace(url + '/' + (EXTRA_QUERY ? '?' + EXTRA_QUERY : ''));
     });
   }
 
