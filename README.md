@@ -30,6 +30,15 @@ YouROK `TorrServer-linux-arm7` в `/media/developer/torrstream-torrserver`,
 `luna://org.webosbrew.hbchannel.service/exec`; код — `torrents.js: WebOSTorrServer`.
 Без root приложение работает как обычно.
 
+## Названия дорожек (ffprobe)
+
+С 1.0.4 в пакете служба `com.torrstream.app.service` (`service/`) со
+статическим `ffprobe` под armhf (сборки johnvansickle.com, скачивает
+`tools/build.py`). Плеер (`player.js: webosProbeStart`) спрашивает у неё потоки
+файла и подписывает аудиодорожки и субтитры: название, язык, каналы, кодек,
+«по умолчанию»/«принудительные». ffprobe запускается через `execFile` без
+оболочки; ошибки отдаются без адреса (в нём бывают логин и пароль TorrServer).
+
 ## Что в пакете
 
 `app/` — запускалка:

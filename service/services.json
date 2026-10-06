@@ -1,0 +1,13 @@
+{
+    "id": "com.torrstream.app.service",
+    "description": "TorrStream service",
+    "services": [{
+        "name": "com.torrstream.app.service",
+        "description": "TorrStream service",
+        "commands": [{
+            "name": "ffprobe",
+            "description": "Потоки файла (язык, название, кодек, каналы)",
+            "public": true
+        }]
+    }]
+}

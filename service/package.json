@@ -1,0 +1,6 @@
+{
+    "name": "com.torrstream.app.service",
+    "version": "1.0.0",
+    "description": "TorrStream: ffprobe для названий аудиодорожек и субтитров",
+    "main": "service.js"
+}
