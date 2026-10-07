@@ -1,7 +1,10 @@
 # Сборка ipk для webOS (LG) по тегу v* (git tag v1.0.1 && git push origin v1.0.1).
 #
 # Версия пакета берётся из тега (tools/build.py --version), править руками не
-# нужно. Результат — com.torrstream.app_<версия>_all.ipk и постоянное имя
+# нужно. Тег с суффиксом (v1.0.5-test1) — тестовая сборка: версия пакета без
+# суффикса (webOS принимает только цифры), релиз — pre-release с заметками из
+# RELEASE_NOTES_TEST.md, поэтому releases/latest/download по-прежнему ведёт на
+# последнюю обычную. Результат — com.torrstream.app_<версия>_all.ipk и постоянное имя
 # TorrStream-webOS.ipk для ссылки releases/latest/download/TorrStream-webOS.ipk.
 # Встроенный TorrServer (с 1.0.2) — в этой же сборке; ставить свой TorrServer
 # можно только с root через Homebrew Channel.
@@ -29,7 +32,7 @@ jobs:
       - name: ipk
         run: |
           VER=""
-          case "$GITHUB_REF" in refs/tags/v*) VER="--version ${GITHUB_REF_NAME#v}";; esac
+          case "$GITHUB_REF" in refs/tags/v*) V="${GITHUB_REF_NAME#v}"; VER="--version ${V%%-*}";; esac
           python3 tools/build.py $VER
           ls -la dist
 
@@ -38,6 +41,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          case "$GITHUB_REF_NAME" in
+            *-*)
+              gh release create "$GITHUB_REF_NAME" dist/*.ipk --prerelease \
+                --title "TorrStream для webOS ${GITHUB_REF_NAME#v} (тестовая)" \
+                --notes-file RELEASE_NOTES_TEST.md
+              exit 0;;
+          esac
           gh release create "$GITHUB_REF_NAME" dist/*.ipk \
             --title "TorrStream для webOS ${GITHUB_REF_NAME#v}" \
             --notes "Приложение TorrStream для webOS со встроенным TorrServer: на телевизоре с root (Homebrew Channel) TorrServer скачивается и запускается из настроек; без root приложение работает как обычно. Установка: webOS Dev Manager (Developer Mode или root). Отдельная сборка com.torrstream.app.ts больше не нужна — её можно удалить."

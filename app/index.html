@@ -10,8 +10,13 @@
   поэтому обновляется без переустановки ipk.
 
   При старте открываем сохранённый адрес (по умолчанию общий
-  http://torrstream.online). Пока идёт отсчёт, ОК или любая стрелка
+  torrstream.online). Пока идёт отсчёт, ОК или любая стрелка
   показывают форму смены адреса. Сервер не ответил — сразу форма с ошибкой.
+
+  На webOS с Chrome 94+ (webOS 23 и новее) общий сервер открываем по https:
+  страницу, открытую по http:// из интернета, Chrome не пускает в локальную
+  сеть и на сам телевизор (Private Network Access), и встроенный TorrServer
+  на localhost был бы недоступен. С защищённой страницы localhost доступен.
 
   ES5 без зависимостей: на webOS 3–4 браузерный движок уровня Chrome 38–53.
   «Назад» (461) приходит сюда клавишей — в appinfo.json disableBackHistoryAPI.
@@ -59,7 +64,15 @@
 </div>
 <script>
 (function () {
-  var DEFAULT_URL = 'http://torrstream.online';
+  // Версия движка: на старых webOS https не нужен (и мог бы не завестись)
+  var CHROME = (function () {
+    var m = /Chrome\/(\d+)/.exec(navigator.userAgent || '');
+    return m ? parseInt(m[1], 10) : 0;
+  })();
+  var NEED_HTTPS = CHROME >= 94;
+  // https поднимаем только у общего сервера — у своего его может и не быть
+  var HTTPS_HOSTS = { 'torrstream.online': 1, 'www.torrstream.online': 1 };
+  var DEFAULT_URL = NEED_HTTPS ? 'https://torrstream.online' : 'http://torrstream.online';
   var KEY = 'torrstreamServerUrl';
   var COUNTDOWN = 3;
   var KEYS = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, OK: 13, BACK: 461, ESC: 27 };
@@ -86,6 +99,14 @@
     if (!url) return '';
     if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
     return url;
+  }
+
+  /** http:// общего сервера на новом движке — https:// */
+  function preferHttps(url) {
+    var m = /^http:\/\/([^\/:]+)(.*)$/i.exec(url);
+    // С явным портом (torrstream.online:3000) — как ввели: https там может не быть
+    if (!NEED_HTTPS || !m || m[2].charAt(0) === ':' || !HTTPS_HOSTS[m[1].toLowerCase()]) return url;
+    return 'https://' + m[1] + m[2];
   }
 
   function setFocus(i) {
@@ -138,10 +159,17 @@
     statusEl.className = 'status';
     statusEl.textContent = 'Подключение к ' + url.replace(/^https?:\/\//, '') + '…';
     hintEl.textContent = '';
-    probe(url, function (ok) {
-      if (!ok) { showForm(url.replace(/^https?:\/\//, '') + ' — не отвечает или это не сервер TorrStream', true, url); return; }
-      save(url);
-      location.replace(url + '/');
+    var secure = preferHttps(url);
+    var open = function (target) { save(url); location.replace(target + '/'); };
+    probe(secure, function (ok) {
+      if (ok) { open(secure); return; }
+      if (secure === url) { showForm(url.replace(/^https?:\/\//, '') + ' — не отвечает или это не сервер TorrStream', true, url); return; }
+      // https не ответил — открываем как раньше, по http: приложение работает,
+      // недоступен только TorrServer на самом телевизоре
+      probe(url, function (ok2) {
+        if (ok2) { open(url); return; }
+        showForm(url.replace(/^https?:\/\//, '') + ' — не отвечает или это не сервер TorrStream', true, url);
+      });
     });
   }
 
