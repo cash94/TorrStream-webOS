@@ -8,6 +8,10 @@
             "name": "ffprobe",
             "description": "Потоки файла (язык, название, кодек, каналы)",
             "public": true
+        }, {
+            "name": "rutube",
+            "description": "Ответ API RuTube для поиска трейлера (мимо сервера TorrStream)",
+            "public": true
         }]
     }]
 }

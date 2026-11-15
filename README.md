@@ -39,6 +39,22 @@ YouROK `TorrServer-linux-arm7` в `/media/developer/torrstream-torrserver`,
 «по умолчанию»/«принудительные». ffprobe запускается через `execFile` без
 оболочки; ошибки отдаются без адреса (в нём бывают логин и пароль TorrServer).
 
+## Трейлеры RuTube с телевизора
+
+С 1.0.6 трейлер ищется и играет с телевизора, мимо сервера TorrStream (как в
+Android-приложении). RuTube не отдаёт `Access-Control-Allow-Origin`, поэтому:
+- API RuTube (поиск, `play/options`) страница спрашивает у службы
+  `luna://com.torrstream.app.service/rutube` `{url}` — только
+  `https://rutube.ru/api/…`. Старая Node.js на webOS не знает корня
+  Let's Encrypt, которым подписан rutube.ru: тогда служба повторяет запрос со
+  своими корнями ISRG (`service/ca/letsencrypt.pem`), проверка сертификата остаётся;
+- видео (плейлисты и сегменты) играет плеер телевизора прямо с RuTube через
+  `<video>` — медиаплеер CORS не проверяет.
+
+Ipk без метода `rutube` — API через сервер; прямое видео не пошло — этот и
+следующие ролики через прокси сервера. Логика — во фронтенде
+(`catalog.js: rutubeVideoDirect, rutubeDeviceJson`).
+
 ## Что в пакете
 
 `app/` — запускалка:

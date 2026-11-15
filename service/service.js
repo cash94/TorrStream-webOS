@@ -8,6 +8,12 @@
  *
  * Запускаем через execFile с аргументами списком, без оболочки: адрес приходит
  * со страницы и в командную строку как текст попадать не должен.
+ *
+ * rutube — ответ API RuTube (поиск, play/options) для трейлеров: сам RuTube
+ * не отдаёт Access-Control-Allow-Origin, и страница его не прочитает, а
+ * служба — может. Так трейлер ищется с телевизора, мимо сервера TorrStream;
+ * видео телевизор берёт с RuTube сам через <video> (фронтенд, catalog.js:
+ * rutubeVideoDirect).
  * ES5: на старых webOS Node.js 0.10–0.12.
  */
 var Service = require('webos-service');
@@ -15,6 +21,8 @@ var execFile = require('child_process').execFile;
 var dns = require('dns');
 var url = require('url');
 var path = require('path');
+var https = require('https');
+var fs = require('fs');
 
 var service = new Service('com.torrstream.app.service');
 var FFPROBE = path.join(__dirname, 'ffprobe');
@@ -52,5 +60,79 @@ service.register('ffprobe', function (message) {
                 }
                 message.respond({ returnValue: true, data: String(stdout) });
             });
+    });
+});
+
+// ==================== RuTube ====================
+
+var RUTUBE_TIMEOUT_MS = 15000;
+var RUTUBE_MAX_BYTES = 4 * 1024 * 1024;
+var RUTUBE_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0 Safari/537.36 WebAppManager',
+    'Accept': 'application/json',
+    'Referer': 'https://rutube.ru/'
+};
+// Старые webOS (Node.js 0.10–0.12) не знают корня Let's Encrypt, которым
+// подписан rutube.ru: с их встроенным списком запрос падает на проверке
+// сертификата. Тогда повторяем со своими корнями ISRG (ca/letsencrypt.pem) —
+// проверка остаётся, просто с корнем, которого в старой Node.js нет
+var LE_ROOTS = null;
+try { LE_ROOTS = fs.readFileSync(path.join(__dirname, 'ca', 'letsencrypt.pem'), 'utf8'); } catch (e) { }
+var CERT_ERRORS = /CERT|ISSUER|SELF_SIGNED|UNABLE_TO_VERIFY|certificate/i;
+
+function isRutubeApi(u) {
+    return u && u.protocol === 'https:' && u.hostname === 'rutube.ru' && !u.port &&
+        typeof u.pathname === 'string' && u.pathname.indexOf('/api/') === 0;
+}
+
+/** GET к API RuTube; done(ошибка, тело). Ошибка — {text, status} */
+function rutubeGet(u, ca, done) {
+    var finished = false;
+    var finish = function (err, body) {
+        if (finished) return;
+        finished = true;
+        done(err, body);
+    };
+    var options = { hostname: u.hostname, port: 443, path: u.path, method: 'GET', headers: RUTUBE_HEADERS };
+    if (ca) { options.ca = ca; options.agent = false; }
+    var req = https.request(options, function (res) {
+        if (res.statusCode !== 200) {
+            res.resume();
+            finish({ text: 'RuTube: HTTP ' + res.statusCode, status: res.statusCode });
+            return;
+        }
+        var chunks = [], size = 0;
+        res.on('data', function (c) {
+            size += c.length;
+            if (size > RUTUBE_MAX_BYTES) { req.abort(); finish({ text: 'RuTube: ответ больше 4 МБ' }); return; }
+            chunks.push(c);
+        });
+        res.on('end', function () { finish(null, Buffer.concat(chunks).toString('utf8')); });
+        res.on('error', function (e) { finish({ text: 'RuTube: ' + (e.code || e.message) }); });
+    });
+    req.setTimeout(RUTUBE_TIMEOUT_MS, function () {
+        req.abort();
+        finish({ text: 'RuTube: нет ответа за ' + (RUTUBE_TIMEOUT_MS / 1000) + ' с' });
+    });
+    req.on('error', function (e) {
+        finish({ text: 'RuTube: ' + (e.code || e.message), cert: CERT_ERRORS.test(String(e.code || '') + ' ' + String(e.message || '')) });
+    });
+    req.end();
+}
+
+service.register('rutube', function (message) {
+    var target = message.payload && message.payload.url;
+    var u = typeof target === 'string' ? url.parse(target) : null;
+    if (!isRutubeApi(u)) {
+        message.respond({ returnValue: false, errorText: 'нужен адрес https://rutube.ru/api/…' });
+        return;
+    }
+    var reply = function (err, body) {
+        if (err) message.respond({ returnValue: false, errorText: err.text, status: err.status || 0 });
+        else message.respond({ returnValue: true, data: body });
+    };
+    rutubeGet(u, null, function (err, body) {
+        if (err && err.cert && LE_ROOTS) { rutubeGet(u, LE_ROOTS, reply); return; }
+        reply(err, body);
     });
 });
